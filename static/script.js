@@ -3,12 +3,13 @@ const RESUME_URL = "/api/resume";
 
 const $ = (id) => document.getElementById(id);
 
-const composeCard = $("composeCard");
 const ticketInput = $("ticket");
+const charCount = $("charCount");
 const startBtn = $("startBtn");
+const startBtnLabel = $("startBtnLabel");
 const errorMsg = $("errorMsg");
 
-const traceCard = $("traceCard");
+const readout = $("readout");
 const badgesEl = $("badges");
 const barsEl = $("bars");
 
@@ -28,11 +29,107 @@ const reviseBtn = $("reviseBtn");
 const resetRow = $("resetRow");
 const copyBtn = $("copyBtn");
 const resetBtn = $("resetBtn");
+const reviewLabel = $("reviewLabel");
 
 let threadId = null;
 let isLastRound = false;
 
-const RISK_LABELS = { toxicity_level: "Toxicity", fraud_risk: "Fraud", pr_risk: "PR/Legal" };
+const RISK_LABELS = { toxicity_level: "Toxicity", fraud_risk: "Fraud", pr_risk: "PR / legal" };
+
+// ---------------------------------------------------------------------------
+// Input niceties: auto-growing textarea, live character count, ⌘/Ctrl+Enter
+// ---------------------------------------------------------------------------
+
+function autoGrow(el) {
+  el.style.height = "auto";
+  el.style.height = `${Math.min(el.scrollHeight, 220)}px`;
+}
+
+ticketInput.addEventListener("input", () => {
+  autoGrow(ticketInput);
+  charCount.textContent = `${ticketInput.value.length} / 4000`;
+});
+
+ticketInput.addEventListener("keydown", (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key === "Enter") start();
+});
+
+// ---------------------------------------------------------------------------
+// Pipeline diagram
+// ---------------------------------------------------------------------------
+
+const ALL_NODE_IDS = ["node-intake", "node-classify", "node-toxicity", "node-fraud", "node-pr", "node-triage", "node-escalate", "node-drafter", "node-review", "node-done"];
+const ALL_LINK_IDS = ["line-ic", "line-ct", "line-cf", "line-cp", "line-tt", "line-ft", "line-pt", "line-te", "line-td", "line-dr", "line-rd", "line-ed", "line-rdone"];
+
+function resetDiagram() {
+  [...ALL_NODE_IDS, ...ALL_LINK_IDS].forEach((id) => {
+    const el = $(id);
+    el.classList.remove("active", "done", "escalated");
+  });
+}
+
+function mark(ids, cls) {
+  ids.forEach((id) => $(id).classList.add(cls));
+}
+
+let processingTimers = [];
+
+function animateProcessing() {
+  resetDiagram();
+  processingTimers.forEach(clearTimeout);
+  processingTimers = [];
+
+  const stages = [
+    ["node-intake"],
+    ["line-ic", "node-classify"],
+    ["line-ct", "line-cf", "line-cp", "node-toxicity", "node-fraud", "node-pr"],
+    ["line-tt", "line-ft", "line-pt", "node-triage"],
+  ];
+
+  stages.forEach((ids, i) => {
+    processingTimers.push(setTimeout(() => mark(ids, "active"), i * 320));
+  });
+}
+
+function settleDiagram(data) {
+  processingTimers.forEach(clearTimeout);
+
+  const alwaysRun = ["node-intake", "line-ic", "node-classify", "line-ct", "line-cf", "line-cp", "node-toxicity", "node-fraud", "node-pr", "line-tt", "line-ft", "line-pt", "node-triage"];
+  alwaysRun.forEach((id) => {
+    $(id).classList.remove("active");
+    $(id).classList.add("done");
+  });
+
+  if (data.status === "escalated") {
+    mark(["line-te", "node-escalate"], "active");
+    $("node-escalate").classList.add("escalated");
+    mark(["line-ed", "node-done"], "done");
+    return;
+  }
+
+  mark(["line-td", "node-drafter"], "done");
+  reviewLabel.textContent = data.category && data.risk_level === "Low" ? "AI review" : "Review";
+
+  if (data.status === "awaiting_review") {
+    mark(["line-dr", "node-review"], "active");
+    return;
+  }
+
+  mark(["line-dr", "node-review"], "done");
+  mark(["line-rdone", "node-done"], "done");
+}
+
+function animateRetry() {
+  mark(["line-rd"], "active");
+  setTimeout(() => {
+    $("line-rd").classList.remove("active");
+    mark(["node-drafter", "line-dr", "node-review"], "active");
+  }, 500);
+}
+
+// ---------------------------------------------------------------------------
+// API + state rendering
+// ---------------------------------------------------------------------------
 
 async function post(url, body) {
   const res = await fetch(url, {
@@ -53,7 +150,7 @@ async function post(url, body) {
 
 function setBusy(busy, label) {
   [startBtn, approveBtn, reviseBtn].forEach((b) => (b.disabled = busy));
-  if (label) startBtn.textContent = busy ? label : "Run pipeline";
+  startBtnLabel.textContent = busy ? (label || "Running...") : "Run pipeline";
 }
 
 function barColor(score) {
@@ -63,30 +160,34 @@ function barColor(score) {
 }
 
 function renderTrace(data) {
-  traceCard.hidden = false;
   badgesEl.innerHTML = "";
   barsEl.innerHTML = "";
 
   const riskClass = `risk-${data.risk_level.toLowerCase()}`;
-  [
-    ["Category", data.category],
-    ["Risk", data.risk_level, riskClass],
-  ].forEach(([label, value, extraClass]) => {
+  const chip = (text, cls) => {
     const span = document.createElement("span");
-    span.className = `badge ${extraClass || ""}`.trim();
-    span.textContent = `${label.toUpperCase()}: ${value}`;
+    span.className = `badge ${cls || ""}`.trim();
+    span.textContent = text;
     badgesEl.appendChild(span);
-  });
+  };
+  chip(data.category);
+  chip(`${data.risk_level} risk`, riskClass);
 
   Object.entries(data.risk_scores || {}).forEach(([key, score]) => {
     const row = document.createElement("div");
     row.className = "bar-row";
     row.innerHTML = `
       <span class="bar-label">${RISK_LABELS[key] || key}</span>
-      <span class="bar-track"><span class="bar-fill" style="width:${score}%;background:${barColor(score)}"></span></span>
+      <span class="bar-track"><span class="bar-fill"></span></span>
       <span class="bar-value">${score}</span>
     `;
     barsEl.appendChild(row);
+    // Set the width on the next frame so the CSS transition actually animates it.
+    requestAnimationFrame(() => {
+      const fill = row.querySelector(".bar-fill");
+      fill.style.width = `${score}%`;
+      fill.style.background = barColor(score);
+    });
   });
 }
 
@@ -100,23 +201,25 @@ function renderSteps(attempt, max) {
   }
 }
 
-function render(data) {
+function render(data, { isRetry } = {}) {
   threadId = data.thread_id;
-  composeCard.hidden = true;
+  readout.hidden = false;
   renderTrace(data);
 
+  if (isRetry) animateRetry();
+  settleDiagram(data);
+
   if (data.status === "escalated") {
-    draftCard.hidden = true;
-    outcomeCard.hidden = false;
-    outcomeCard.className = "card banner danger";
-    outcomeText.textContent = "Escalated to a human — risk was too high for an automated reply. No draft was generated.";
-    resetRow.hidden = false;
-    actions.hidden = true;
     draftCard.hidden = false;
     draftTitle.textContent = "Outcome";
     draftEl.hidden = true;
+    actions.hidden = true;
+    resetRow.hidden = false;
     attemptLabel.textContent = "";
     stepsEl.innerHTML = "";
+    outcomeCard.hidden = false;
+    outcomeCard.className = "banner danger";
+    outcomeText.textContent = "Escalated to a human — risk was too high for an automated reply. No draft was generated.";
     return;
   }
 
@@ -143,13 +246,13 @@ function render(data) {
   outcomeCard.hidden = false;
 
   if (data.status === "auto_resolved") {
-    outcomeCard.className = "card banner ok";
+    outcomeCard.className = "banner ok";
     outcomeText.textContent = "Auto-resolved — low risk, AI reviewer approved it, no human needed.";
   } else if (data.status === "approved") {
-    outcomeCard.className = "card banner ok";
+    outcomeCard.className = "banner ok";
     outcomeText.textContent = "Approved by human reviewer. Ready to send.";
   } else {
-    outcomeCard.className = "card banner warn";
+    outcomeCard.className = "banner warn";
     outcomeText.textContent = "Attempt limit reached. This draft was never approved — review it manually.";
   }
 }
@@ -158,29 +261,33 @@ async function start() {
   const ticket = ticketInput.value.trim();
   if (!ticket) {
     errorMsg.textContent = "Paste a ticket first.";
+    ticketInput.focus();
     return;
   }
 
   errorMsg.textContent = "";
+  readout.hidden = true;
   setBusy(true, "Running pipeline...");
+  animateProcessing();
 
   try {
     render(await post(START_URL, { raw_ticket: ticket }));
   } catch (err) {
     errorMsg.textContent = `Error: ${err.message}`;
+    resetDiagram();
   } finally {
     setBusy(false);
   }
 }
 
-async function respond(text, busyLabel) {
+async function respond(text, busyLabel, isRetry) {
   errorMsg.textContent = "";
   setBusy(true);
   const original = reviseBtn.textContent;
   if (busyLabel) reviseBtn.textContent = busyLabel;
 
   try {
-    render(await post(RESUME_URL, { thread_id: threadId, response: text }));
+    render(await post(RESUME_URL, { thread_id: threadId, response: text }), { isRetry });
   } catch (err) {
     errorMsg.textContent = `Error: ${err.message}`;
     reviseBtn.textContent = original;
@@ -197,27 +304,28 @@ reviseBtn.addEventListener("click", () => {
     errorMsg.textContent = "Add some feedback so the rewrite knows what to fix.";
     return;
   }
-  respond(text || "Not approved by human.", isLastRound ? "Finishing..." : "Rewriting...");
+  respond(text || "Not approved by human.", isLastRound ? "Finishing..." : "Rewriting...", !isLastRound);
 });
 
 copyBtn.addEventListener("click", async () => {
+  const original = copyBtn.textContent;
   try {
     await navigator.clipboard.writeText(draftEl.textContent);
     copyBtn.textContent = "Copied";
   } catch (_) {
     copyBtn.textContent = "Copy failed";
   }
-  setTimeout(() => (copyBtn.textContent = "Copy reply"), 1500);
+  setTimeout(() => (copyBtn.textContent = original === "Copied" ? "Copy reply" : original), 1500);
 });
 
 resetBtn.addEventListener("click", () => {
   threadId = null;
   ticketInput.value = "";
+  autoGrow(ticketInput);
+  charCount.textContent = "0 / 4000";
   errorMsg.textContent = "";
-  traceCard.hidden = true;
-  outcomeCard.hidden = true;
-  draftCard.hidden = true;
-  composeCard.hidden = false;
+  readout.hidden = true;
+  resetDiagram();
   ticketInput.focus();
 });
 
