@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OmniDesk</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="page">
+    <header class="page-head">
+      <span class="tag">TICKET AUTOPILOT</span>
+      <h1>Safe tickets resolve themselves. Risky ones find a human.</h1>
+    </header>
+
+    <section class="card" id="composeCard">
+      <label for="ticket">Customer ticket</label>
+      <textarea id="ticket" rows="6" maxlength="4000" placeholder="Paste the customer's email or chat message here..."></textarea>
+      <button id="startBtn" class="btn primary">Run pipeline</button>
+      <p id="errorMsg" class="error" role="alert"></p>
+    </section>
+
+    <section class="card" id="traceCard" hidden>
+      <h2 class="section-title">Pipeline trace</h2>
+      <div class="badges" id="badges"></div>
+      <div class="bars" id="bars"></div>
+    </section>
+
+    <section class="card banner" id="outcomeCard" hidden>
+      <p id="outcomeText"></p>
+    </section>
+
+    <section class="card" id="draftCard" hidden>
+      <div class="draft-head">
+        <h2 class="section-title" id="draftTitle">Draft reply</h2>
+        <div class="attempt">
+          <span id="attemptLabel"></span>
+          <span class="steps" id="steps" aria-hidden="true"></span>
+        </div>
+      </div>
+
+      <div class="draft" id="draft"></div>
+
+      <div id="actions" hidden>
+        <p class="last-note" id="lastNote" hidden>This is the final round. Approve it, or finish and keep this draft unapproved.</p>
+        <label for="feedback">Feedback for a rewrite</label>
+        <textarea id="feedback" rows="3" maxlength="2000" placeholder="e.g. Shorter, more apologetic, mention the refund timeline placeholder..."></textarea>
+        <div class="btn-row">
+          <button id="approveBtn" class="btn primary">Approve</button>
+          <button id="reviseBtn" class="btn ghost">Request rewrite</button>
+        </div>
+      </div>
+
+      <div class="btn-row" id="resetRow" hidden>
+        <button id="copyBtn" class="btn primary">Copy reply</button>
+        <button id="resetBtn" class="btn ghost">New ticket</button>
+      </div>
+    </section>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
