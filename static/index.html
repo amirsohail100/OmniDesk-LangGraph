@@ -1,41 +1,85 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>OmniDesk</title>
-  <link rel="icon" type="image/svg+xml" href="../assets/icon/icon.svg">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css" />
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>OmniDesk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <main class="page">
-    <header class="page-head">
-      <span class="tag">TICKET AUTOPILOT</span>
-      <h1>Safe tickets resolve themselves. Risky ones find a human.</h1>
-    </header>
+<div class="grid-bg" aria-hidden="true"></div>
+<div class="glow" aria-hidden="true"></div>
 
-    <section class="card" id="composeCard">
-      <label for="ticket">Customer ticket</label>
-      <textarea id="ticket" rows="6" maxlength="4000" placeholder="Paste the customer's email or chat message here..."></textarea>
-      <button id="startBtn" class="btn primary">Run pipeline</button>
-      <p id="errorMsg" class="error" role="alert"></p>
-    </section>
+<main class="console">
 
-    <section class="card" id="traceCard" hidden>
-      <h2 class="section-title">Pipeline trace</h2>
+  <header class="hero">
+    <h1>Watch a ticket move through the pipeline.</h1>
+    <p class="hero-sub">Classified and risk-scanned automatically. Safe tickets resolve themselves; risky ones wait for you.</p>
+  </header>
+
+  <section class="diagram-wrap">
+    <svg class="diagram" viewBox="0 0 920 240" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Pipeline diagram">
+      <g class="links">
+        <line id="line-ic" class="link" x1="60" y1="120" x2="190" y2="120"/>
+        <line id="line-ct" class="link" x1="190" y1="120" x2="340" y2="50"/>
+        <line id="line-cf" class="link" x1="190" y1="120" x2="340" y2="120"/>
+        <line id="line-cp" class="link" x1="190" y1="120" x2="340" y2="190"/>
+        <line id="line-tt" class="link" x1="340" y1="50" x2="480" y2="120"/>
+        <line id="line-ft" class="link" x1="340" y1="120" x2="480" y2="120"/>
+        <line id="line-pt" class="link" x1="340" y1="190" x2="480" y2="120"/>
+        <line id="line-te" class="link" x1="480" y1="120" x2="625" y2="50"/>
+        <line id="line-td" class="link" x1="480" y1="120" x2="625" y2="120"/>
+        <path id="line-dr" class="link" d="M647,120 L753,120"/>
+        <path id="line-rd" class="link link-loop" d="M753,134 Q700,172 647,134"/>
+        <path id="line-ed" class="link" d="M625,50 Q800,30 870,108"/>
+        <path id="line-rdone" class="link" d="M775,120 L870,120"/>
+      </g>
+      <g class="nodes">
+        <g id="node-intake" class="node"><circle r="20" cx="60" cy="120"/><text x="60" y="124">IN</text><text class="node-label" x="60" y="156">Intake</text></g>
+        <g id="node-classify" class="node"><circle r="20" cx="190" cy="120"/><text x="190" y="124">CL</text><text class="node-label" x="190" y="156">Classify</text></g>
+        <g id="node-toxicity" class="node sm"><circle r="15" cx="340" cy="50"/><text x="340" y="54">TX</text><text class="node-label" x="340" y="25">Toxicity</text></g>
+        <g id="node-fraud" class="node sm"><circle r="15" cx="340" cy="120"/><text x="340" y="124">FR</text><text class="node-label" x="340" y="150">Fraud</text></g>
+        <g id="node-pr" class="node sm"><circle r="15" cx="340" cy="190" /><text x="340" y="194">PR</text><text class="node-label" x="340" y="220">Legal</text></g>
+        <g id="node-triage" class="node"><circle r="20" cx="480" cy="120"/><text x="480" y="124">TR</text><text class="node-label" x="480" y="156">Triage</text></g>
+        <g id="node-escalate" class="node sm branch"><circle r="17" cx="625" cy="50"/><text x="625" y="54">!</text><text class="node-label" x="625" y="22">Escalate</text></g>
+        <g id="node-drafter" class="node"><circle r="20" cx="625" cy="120"/><text x="625" y="124">DR</text><text class="node-label" x="625" y="156">Draft</text></g>
+        <g id="node-review" class="node"><circle r="20" cx="765" cy="120"/><text x="765" y="124">RV</text><text class="node-label" id="reviewLabel" x="765" y="156">Review</text></g>
+        <g id="node-done" class="node"><circle r="20" cx="880" cy="120"/><text x="880" y="124">✓</text><text class="node-label" x="880" y="156">Done</text></g>
+      </g>
+    </svg>
+  </section>
+
+  <section class="input-console">
+    <div class="prompt-row">
+      <span class="prompt-marker" aria-hidden="true">&gt;</span>
+      <textarea id="ticket" rows="1" maxlength="4000" placeholder="Paste the customer's ticket here..."></textarea>
+    </div>
+    <div class="input-footer">
+      <span class="char-count" id="charCount">0 / 4000</span>
+      <button id="startBtn" class="btn primary">
+        <span id="startBtnLabel">Run pipeline</span>
+        <kbd class="shortcut">⌘⏎</kbd>
+      </button>
+    </div>
+    <p id="errorMsg" class="error" role="alert"></p>
+  </section>
+
+  <section class="readout" id="readout" hidden>
+
+    <div class="trace">
       <div class="badges" id="badges"></div>
       <div class="bars" id="bars"></div>
-    </section>
+    </div>
 
-    <section class="card banner" id="outcomeCard" hidden>
+    <div class="banner" id="outcomeCard" hidden>
       <p id="outcomeText"></p>
-    </section>
+    </div>
 
-    <section class="card" id="draftCard" hidden>
+    <div class="draft-panel" id="draftCard" hidden>
       <div class="draft-head">
-        <h2 class="section-title" id="draftTitle">Draft reply</h2>
+        <h2 id="draftTitle">Reply</h2>
         <div class="attempt">
           <span id="attemptLabel"></span>
           <span class="steps" id="steps" aria-hidden="true"></span>
@@ -47,7 +91,7 @@
       <div id="actions" hidden>
         <p class="last-note" id="lastNote" hidden>This is the final round. Approve it, or finish and keep this draft unapproved.</p>
         <label for="feedback">Feedback for a rewrite</label>
-        <textarea id="feedback" rows="3" maxlength="2000" placeholder="e.g. Shorter, more apologetic, mention the refund timeline placeholder..."></textarea>
+        <textarea id="feedback" rows="2" maxlength="2000" placeholder="e.g. Shorter, more apologetic, mention the refund timeline placeholder..."></textarea>
         <div class="btn-row">
           <button id="approveBtn" class="btn primary">Approve</button>
           <button id="reviseBtn" class="btn ghost">Request rewrite</button>
@@ -58,9 +102,12 @@
         <button id="copyBtn" class="btn primary">Copy reply</button>
         <button id="resetBtn" class="btn ghost">New ticket</button>
       </div>
-    </section>
-  </main>
+    </div>
 
-  <script src="script.js"></script>
+  </section>
+
+</main>
+
+<script src="script.js"></script>
 </body>
 </html>
